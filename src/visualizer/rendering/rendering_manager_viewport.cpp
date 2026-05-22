@@ -245,18 +245,78 @@ namespace lfs::vis {
         if (width <= 0 || height <= 0) {
             return {};
         }
+        if (!last_vulkan_context_) {
+            LOG_TRACE("Gaussian preview image skipped: no Vulkan context is available");
+            return {};
+        }
         auto render_lock = acquireLiveModelRenderLock(scene_manager);
-        const auto render_state = scene_manager ? scene_manager->buildRenderState() : SceneRenderState{};
+        auto render_state = scene_manager ? scene_manager->buildRenderState() : SceneRenderState{};
         const auto* const model = render_state.combined_model;
         if (!hasRenderableGaussians(model)) {
             return {};
         }
 
-        (void)rotation;
-        (void)position;
-        (void)focal_length_mm;
-        LOG_TRACE("Gaussian preview image skipped: no Vulkan offscreen preview path is available");
-        return {};
+        RenderSettings preview_settings = getSettings();
+        preview_settings.focal_length_mm = std::clamp(
+            focal_length_mm,
+            lfs::rendering::MIN_FOCAL_LENGTH_MM,
+            lfs::rendering::MAX_FOCAL_LENGTH_MM);
+        preview_settings.split_view_mode = SplitViewMode::Disabled;
+        preview_settings.equirectangular = false;
+
+        Viewport preview_viewport(
+            static_cast<std::size_t>(width),
+            static_cast<std::size_t>(height));
+        preview_viewport.setViewMatrix(rotation, position);
+
+        FrameContext frame_ctx{
+            .viewport = preview_viewport,
+            .render_lock_held = render_lock.has_value(),
+            .scene_manager = scene_manager,
+            .model = model,
+            .scene_state = std::move(render_state),
+            .settings = preview_settings,
+            .render_size = {width, height},
+            .viewport_pos = {0, 0},
+            .cursor_preview = {},
+            .gizmo = {},
+            .view_panels = {},
+        };
+
+        auto request = buildViewportRenderRequest(frame_ctx, frame_ctx.render_size);
+        request.raster_backend =
+            lfs::rendering::normalizeViewerRasterBackend(request.raster_backend, request.gut);
+        request.gut = lfs::rendering::isGutBackend(request.raster_backend);
+        if (!lfs::rendering::isVkSplatBackend(request.raster_backend)) {
+            LOG_TRACE("Gaussian preview image skipped: unsupported raster backend '{}'",
+                      lfs::rendering::gaussianRasterBackendId(request.raster_backend));
+            return {};
+        }
+
+        if (!vksplat_viewport_renderer_) {
+            vksplat_viewport_renderer_ = std::make_unique<VksplatViewportRenderer>();
+        }
+
+        auto render_result = vksplat_viewport_renderer_->render(
+            *last_vulkan_context_,
+            *model,
+            request,
+            false,
+            VksplatViewportRenderer::OutputSlot::Preview,
+            false);
+        if (!render_result) {
+            LOG_TRACE("Gaussian preview image render failed: {}", render_result.error());
+            return {};
+        }
+
+        auto image = vksplat_viewport_renderer_->readOutputImage(
+            *last_vulkan_context_,
+            VksplatViewportRenderer::OutputSlot::Preview);
+        if (!image) {
+            LOG_TRACE("Gaussian preview image readback failed: {}", image.error());
+            return {};
+        }
+        return std::move(*image);
     }
 
     float RenderingManager::getDepthAtPixel(const int x, const int y,

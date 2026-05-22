@@ -66,6 +66,7 @@ namespace lfs::vis {
             Main = 0,
             SplitLeft = 1,
             SplitRight = 2,
+            Preview = 3,
         };
 
         struct SelectionMaskRequest {
@@ -207,7 +208,7 @@ namespace lfs::vis {
             VkImageLayout depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
             std::uint64_t generation = 0;
         };
-        static constexpr std::size_t kOutputSlotCount = 3;
+        static constexpr std::size_t kOutputSlotCount = 4;
         std::array<OutputImageSlot, kOutputSlotCount> output_slots_{};
 
         // Fallback CUDA-backed input buffers for models that are not already
