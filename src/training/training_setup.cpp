@@ -190,7 +190,7 @@ namespace lfs::training {
                      params.add_splat_paths.size() == 1 ? "" : "s",
                      base_count,
                      added_count,
-            model.size());
+                     model.size());
             if (frozen_count > 0) {
                 LOG_INFO("Marked {} added Gaussian{} as frozen",
                          frozen_count,
