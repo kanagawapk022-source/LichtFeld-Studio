@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "core/export.hpp"
 #include "core/scene.hpp"
 #include "gui/gizmo_transform.hpp"
 #include "gui/panel_layout.hpp"
@@ -53,10 +54,10 @@ namespace lfs::vis {
 
             [[nodiscard]] bool isCropboxGizmoActive() const;
             [[nodiscard]] bool isEllipsoidGizmoActive() const;
-            void setCropToolShape(const std::string& shape);
-            [[nodiscard]] std::string cropToolShape() const;
-            void fitActiveCropTool(bool use_percentile);
-            void applyActiveCropTool();
+            LFS_VIS_API void setCropToolShape(const std::string& shape);
+            [[nodiscard]] LFS_VIS_API std::string cropToolShape() const;
+            LFS_VIS_API void fitActiveCropTool(bool use_percentile);
+            LFS_VIS_API void applyActiveCropTool();
             [[nodiscard]] bool isViewportGizmoDragging() const { return viewport_gizmo_dragging_; }
             [[nodiscard]] bool isPositionInViewportGizmo(double x, double y) const;
             [[nodiscard]] ToolType getCurrentToolMode() const;
