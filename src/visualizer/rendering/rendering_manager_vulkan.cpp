@@ -1296,6 +1296,11 @@ namespace lfs::vis {
                 vk_req.model_transforms = pc_request.scene.model_transforms;
                 vk_req.transform_indices = pc_request.scene.transform_indices.get();
                 vk_req.node_visibility_mask = &pc_request.scene.node_visibility_mask;
+                if (settings_.point_cloud_mode && has_visible_gaussian_model &&
+                    model->has_deleted_mask()) {
+                    vk_req.deleted_mask = &model->deleted();
+                    vk_req.deleted_mask_revision = point_cloud_data_revision_;
+                }
                 vk_req.selection_mask = pc_request.overlay.selection_mask.get();
                 vk_req.preview_selection_mask = pc_request.overlay.transient_mask.mask;
                 vk_req.selection_colors = &pc_request.overlay.selection_colors;
