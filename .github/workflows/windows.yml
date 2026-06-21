@@ -149,13 +149,30 @@ jobs:
           set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
           cmake --build build -j %NUMBER_OF_PROCESSORS%
 
+      - name: Build
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
+          cmake --build build -j %NUMBER_OF_PROCESSORS%
+
+      # ===== [追加] 成果物を安全な別フォルダにコピーする =====
+      - name: Stage Artifacts
+        shell: pwsh
+        run: |
+          # コピー先のフォルダを作成
+          New-Item -ItemType Directory -Force -Path dist
+          
+          # 必要なファイルをピンポイントでコピー
+          if (Test-Path "build/LichtFeld-Studio.exe") { Copy-Item "build/LichtFeld-Studio.exe" -Destination "dist/" }
+          if (Test-Path "build/src/python/*.pyd") { Copy-Item "build/src/python/*.pyd" -Destination "dist/" }
+          # vcpkg_installed 以外の、本来のビルド出力にあるDLLだけをコピー（※出力先に応じて適宜調整してください）
+          Get-ChildItem -Path "build" -Filter "*.dll" -Recurse | Where-Object { $_.FullName -notlike "*vcpkg_installed*" } | Copy-Item -Destination "dist/"
+
+      # ===== アップロード対象は dist フォルダのみにする =====
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: LichtFeld-Studio-Windows-${{ matrix.build_type }}
-          path: |
-            build/LichtFeld-Studio.exe
-            build/src/python/*.pyd
-            build/**/*.dll
-            !build/vcpkg_installed/**
+          path: dist/   # これにより build/ 内の危険なフォルダには一切触れません
           if-no-files-found: error
