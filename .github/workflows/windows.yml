@@ -148,3 +148,19 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
           cmake --build build -j %NUMBER_OF_PROCESSORS%
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          # GitHub上でダウンロードするときのZIPファイル名
+          name: LichtFeld-Studio-Windows-${{ matrix.build_type }}
+          
+          # アップロードしたいファイルやフォルダのパス
+          # ※CMakeの出力先（exeやdllが生成される場所）に合わせて適宜調整してください
+          path: |
+            build/**/*.exe
+            build/**/*.dll
+            build/**/*.pyd
+          
+          # 該当ファイルが見つからなかった場合にエラーにする設定（原因特定が楽になります）
+          if-no-files-found: error
