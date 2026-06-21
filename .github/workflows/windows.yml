@@ -158,9 +158,9 @@ jobs:
           # アップロードしたいファイルやフォルダのパス
           # ※CMakeの出力先（exeやdllが生成される場所）に合わせて適宜調整してください
           path: |
-            build/**/*.exe
+            build/LichtFeld-Studio.exe
+            build/src/python/*.pyd
             build/**/*.dll
-            build/**/*.pyd
           
           # 該当ファイルが見つからなかった場合にエラーにする設定（原因特定が楽になります）
           if-no-files-found: error
