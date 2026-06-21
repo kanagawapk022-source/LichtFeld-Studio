@@ -152,15 +152,10 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          # GitHub上でダウンロードするときのZIPファイル名
           name: LichtFeld-Studio-Windows-${{ matrix.build_type }}
-          
-          # アップロードしたいファイルやフォルダのパス
-          # ※CMakeの出力先（exeやdllが生成される場所）に合わせて適宜調整してください
           path: |
             build/LichtFeld-Studio.exe
             build/src/python/*.pyd
             build/**/*.dll
-          
-          # 該当ファイルが見つからなかった場合にエラーにする設定（原因特定が楽になります）
+            !build/vcpkg_installed/**
           if-no-files-found: error
