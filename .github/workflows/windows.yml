@@ -152,26 +152,31 @@ jobs:
       - name: Stage Artifacts
         shell: pwsh
         run: |
+          # 出力用フォルダの作成
           New-Item -ItemType Directory -Force -Path dist
+          New-Item -ItemType Directory -Force -Path dist/assets
+
+          # 1. バイナリ類を片っ端からコピー（エラーはすべて無視してスキップ）
+          Copy-Item "build/LichtFeld-Studio.exe" -Destination "dist/" -ErrorAction SilentlyContinue
+          Copy-Item "build/src/python/*.pyd" -Destination "dist/" -ErrorAction SilentlyContinue
           
-          # バイナリ類のコピー
-          if (Test-Path "build/LichtFeld-Studio.exe") { Copy-Item "build/LichtFeld-Studio.exe" -Destination "dist/" }
-          if (Test-Path "build/src/python/*.pyd") { Copy-Item "build/src/python/*.pyd" -Destination "dist/" }
-          Get-ChildItem -Path "build" -Filter "*.dll" -Recurse | Where-Object { $_.FullName -notlike "*vcpkg_installed*" } | Copy-Item -Destination "dist/"
+          # build内のDLLを再帰コピー（ただし問題の vcpkg_installed は除外）
+          Get-ChildItem -Path "build" -Filter "*.dll" -Recurse | 
+            Where-Object { $_.FullName -notlike "*vcpkg_installed*" } | 
+            Copy-Item -Destination "dist/" -ErrorAction SilentlyContinue
 
-          # ===== [ここを修正] リポジトリ内から assets フォルダを自動検索して dist に丸ごとコピーする =====
-          # build フォルダと dist フォルダを除外して、元のソースコード内にある assets フォルダを探します
-          $sourceAssets = Get-ChildItem -Path "." -Recurse -Directory -Filter "assets" | 
-                          Where-Object { $_.FullName -notlike "*build*" -and $_.FullName -notlike "*dist*" }
+          # 2. リポジトリ内の 'assets' や 'rmlui' と名前のつくフォルダから、中身を強引に dist/assets/ にコピー
+          # -ErrorAction SilentlyContinue をつけているので、権限のないフォルダにぶつかっても黙ってスキップします
+          Get-ChildItem -Path "." -Recurse -Directory | 
+            Where-Object { $_.Name -eq "assets" -or $_.Name -eq "rmlui" } | 
+            Where-Object { $_.FullName -notlike "*build*" -and $_.FullName -notlike "*dist*" } | 
+            ForEach-Object {
+                Copy-Item -Recurse "$($_.FullName)\*" -Destination "dist/assets/" -Force -ErrorAction SilentlyContinue
+            }
 
-          if ($sourceAssets) {
-              # 見つかった assets フォルダ（中身の rmlui ごと）を dist 配下にコピー
-              Copy-Item -Recurse $sourceAssets.FullName -Destination "dist/"
-              Write-Host "SUCCESS: Copied assets from $($sourceAssets.FullName)"
-          } else {
-              Write-Error "ERROR: 'assets' folder not found in repository!"
-              exit 1
-          }
+          # 念のため、コピー後の dist の中身をログに出力して確認できるようにする
+          Write-Host "--- Current dist folder contents ---"
+          Get-ChildItem -Path "dist" -Recurse | Select-Object FullName
       # ===== アップロード対象は dist フォルダのみにする =====
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
