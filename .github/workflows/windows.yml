@@ -148,14 +148,7 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
           cmake --build build -j %NUMBER_OF_PROCESSORS%
-
-      - name: Build
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
-          cmake --build build -j %NUMBER_OF_PROCESSORS%
-
+          
       # ===== [追加] 成果物を安全な別フォルダにコピーする =====
       - name: Stage Artifacts
         shell: pwsh
