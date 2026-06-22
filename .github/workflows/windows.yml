@@ -149,7 +149,6 @@ jobs:
           set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
           cmake --build build -j %NUMBER_OF_PROCESSORS%
           
-      # ===== [追加] 成果物を安全な別フォルダにコピーする =====
       - name: Stage Artifacts
         shell: pwsh
         run: |
@@ -160,16 +159,18 @@ jobs:
           if (Test-Path "build/src/python/*.pyd") { Copy-Item "build/src/python/*.pyd" -Destination "dist/" }
           Get-ChildItem -Path "build" -Filter "*.dll" -Recurse | Where-Object { $_.FullName -notlike "*vcpkg_installed*" } | Copy-Item -Destination "dist/"
 
-          # ===== [ここを修正] dist/assets/ フォルダを作成して rmlui をコピーする =====
-          New-Item -ItemType Directory -Force -Path "dist/assets"
+          # ===== [ここを修正] リポジトリ内から assets フォルダを自動検索して dist に丸ごとコピーする =====
+          # build フォルダと dist フォルダを除外して、元のソースコード内にある assets フォルダを探します
+          $sourceAssets = Get-ChildItem -Path "." -Recurse -Directory -Filter "assets" | 
+                          Where-Object { $_.FullName -notlike "*build*" -and $_.FullName -notlike "*dist*" }
 
-          # リポジトリ内の assets フォルダの位置に合わせてコピー（いくつか可能性のあるパスをカバーしています）
-          if (Test-Path "src/visualizer/gui/assets/rmlui") {
-              Copy-Item -Recurse "src/visualizer/gui/assets/rmlui" -Destination "dist/assets/"
-          } elseif (Test-Path "src/visualizer/resources/assets/rmlui") {
-              Copy-Item -Recurse "src/visualizer/resources/assets/rmlui" -Destination "dist/assets/"
-          } elseif (Test-Path "assets/rmlui") {
-              Copy-Item -Recurse "assets/rmlui" -Destination "dist/assets/"
+          if ($sourceAssets) {
+              # 見つかった assets フォルダ（中身の rmlui ごと）を dist 配下にコピー
+              Copy-Item -Recurse $sourceAssets.FullName -Destination "dist/"
+              Write-Host "SUCCESS: Copied assets from $($sourceAssets.FullName)"
+          } else {
+              Write-Error "ERROR: 'assets' folder not found in repository!"
+              exit 1
           }
       # ===== アップロード対象は dist フォルダのみにする =====
       - name: Upload Build Artifacts
