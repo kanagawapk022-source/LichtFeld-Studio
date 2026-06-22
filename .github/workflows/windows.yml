@@ -160,15 +160,24 @@ jobs:
       - name: Stage Artifacts
         shell: pwsh
         run: |
-          # コピー先のフォルダを作成
           New-Item -ItemType Directory -Force -Path dist
           
-          # 必要なファイルをピンポイントでコピー
+          # バイナリ類のコピー
           if (Test-Path "build/LichtFeld-Studio.exe") { Copy-Item "build/LichtFeld-Studio.exe" -Destination "dist/" }
           if (Test-Path "build/src/python/*.pyd") { Copy-Item "build/src/python/*.pyd" -Destination "dist/" }
-          # vcpkg_installed 以外の、本来のビルド出力にあるDLLだけをコピー（※出力先に応じて適宜調整してください）
           Get-ChildItem -Path "build" -Filter "*.dll" -Recurse | Where-Object { $_.FullName -notlike "*vcpkg_installed*" } | Copy-Item -Destination "dist/"
 
+          # ===== [ここを修正] dist/assets/ フォルダを作成して rmlui をコピーする =====
+          New-Item -ItemType Directory -Force -Path "dist/assets"
+
+          # リポジトリ内の assets フォルダの位置に合わせてコピー（いくつか可能性のあるパスをカバーしています）
+          if (Test-Path "src/visualizer/gui/assets/rmlui") {
+              Copy-Item -Recurse "src/visualizer/gui/assets/rmlui" -Destination "dist/assets/"
+          } elseif (Test-Path "src/visualizer/resources/assets/rmlui") {
+              Copy-Item -Recurse "src/visualizer/resources/assets/rmlui" -Destination "dist/assets/"
+          } elseif (Test-Path "assets/rmlui") {
+              Copy-Item -Recurse "assets/rmlui" -Destination "dist/assets/"
+          }
       # ===== アップロード対象は dist フォルダのみにする =====
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
