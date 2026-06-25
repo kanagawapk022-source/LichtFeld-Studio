@@ -148,60 +148,51 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           set PATH=%CD%\build;%CD%\build\vcpkg_installed\x64-windows\bin;%PATH%
           cmake --build build -j %NUMBER_OF_PROCESSORS%
-          
+         
       - name: Stage Artifacts
         shell: pwsh
         run: |
-          # コピー先（dist）の初期化
+          # 1. 出力用フォルダ（dist）の初期化と、アプリが求めるフォルダ構造の作成
           if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
           New-Item -ItemType Directory -Force -Path dist
+          New-Item -ItemType Directory -Force -Path dist/assets/rmlui
 
-          Write-Host "Starting structured copy from build/ to dist/..."
+          Write-Host "Copying minimal required files..."
 
-          # build フォルダ配下のアイテムを走査
-          Get-ChildItem -Path "build" -Recurse | ForEach-Object {
-              # 1. エラーの原因になる vcpkg のビルド中間キャッシュ(blds)や、
-              #    アップロード不要な巨大フォルダ(vcpkg_installed/vcpkg)は明示的にスキップ
-              if ($_.FullName -like "*vcpkg_installed\vcpkg*" -or $_.FullName -like "*vcpkg_installed\blds*") {
-                  return
-              }
-
-              # 2. コピー先の相対パスを計算 (例: build/src/main.exe -> dist/src/main.exe)
-              $relativePath = $_.FullName.Substring("$PWD\build\".Length)
-              $destinationPath = Join-Path "$PWD\dist" $relativePath
-
-              # 3. 権限がないファイルやエラーはすべてスキップして片っ端からコピー
-              try {
-                  if ($_.PSIsContainer) {
-                      # フォルダの場合
-                      if (-not (Test-Path $destinationPath)) {
-                          New-Item -ItemType Directory -Force -Path $destinationPath -ErrorAction SilentlyContinue | Out-Null
-                      }
-                  } else {
-                      # ファイルの場合
-                      # 親フォルダが存在することを確認
-                      $parentDir = Split-Path $destinationPath
-                      if (-not (Test-Path $parentDir)) {
-                          New-Item -ItemType Directory -Force -Path $parentDir -ErrorAction SilentlyContinue | Out-Null
-                      }
-                      Copy-Item $_.FullName -Destination $destinationPath -Force -ErrorAction SilentlyContinue
-                  }
-              } catch {
-                  # 権限エラー(EPERM)などが発生した場合は黙って次のファイルへ進む
-                  Write-Host "Skipped due to error: $_" -ForegroundColor Yellow
-              }
+          # 2. メインの実行ファイルとPythonバイナリのコピー
+          if (Test-Path "build/LichtFeld-Studio.exe") { Copy-Item "build/LichtFeld-Studio.exe" -Destination "dist/" }
+          if (Test-Path "build/src/python") {
+              New-Item -ItemType Directory -Force -Path "dist/src/python"
+              Copy-Item "build/src/python/*.pyd" -Destination "dist/src/python/" -ErrorAction SilentlyContinue
           }
 
-          # 4. ソースコード側にある元の assets フォルダ（UI等）も念のため階層を維持して dist に統合
-          if (Test-Path "assets") {
-              Copy-Item -Recurse "assets" -Destination "dist/" -Force -ErrorAction SilentlyContinue
+          # 3. 依存DLLのコピー（不要なビルド中間フォルダを避けてbinのみを指定）
+          if (Test-Path "build/vcpkg_installed/x64-windows/bin") {
+              New-Item -ItemType Directory -Force -Path "dist/vcpkg_installed/x64-windows/bin"
+              Copy-Item "build/vcpkg_installed/x64-windows/bin/*.dll" -Destination "dist/vcpkg_installed/x64-windows/bin/" -ErrorAction SilentlyContinue
           }
-          # src配下などに assets が散らばっている場合も考慮して、見つかればコピー
-          Get-ChildItem -Path "src" -Recurse -Directory -Filter "assets" -ErrorAction SilentlyContinue | ForEach-Object {
-              Copy-Item -Recurse "$($_.FullName)\*" -Destination "dist/assets/" -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path "build/src" -Filter "*.dll" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+              $rel = $_.FullName.Substring("$PWD\build\".Length)
+              $dest = Join-Path "$PWD\dist" $rel
+              $parent = Split-Path $dest
+              if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+              Copy-Item $_.FullName -Destination $dest -Force -ErrorAction SilentlyContinue
           }
 
-          Write-Host "Structured copy finished."
+          # 4. 【今回の本命】特定したフォルダ内の中身を、dist/assets/rmlui/ 直下に丸ごとコピー
+          $targetResourceDir = "src/visualizer/gui/rmlui/resources"
+          if (Test-Path $targetResourceDir) {
+              # resources フォルダの「中身（*）」をすべて dist/assets/rmlui/ にコピーします
+              Copy-Item -Recurse "$targetResourceDir\*" -Destination "dist/assets/rmlui/" -Force -ErrorAction SilentlyContinue
+              Write-Host "SUCCESS: Copied UI resources from $targetResourceDir"
+          } else {
+              Write-Error "ERROR: Target resource directory not found: $targetResourceDir"
+              exit 1
+          }
+
+          # 5. 最終確認用として dist 配下の構造をログに出力
+          Write-Host "--- Verifying dist folder structure ---"
+          Get-ChildItem -Path "dist" -Recurse | Select-Object FullName
       # ===== アップロード対象は dist フォルダのみにする =====
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
