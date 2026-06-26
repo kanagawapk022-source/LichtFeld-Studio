@@ -140,8 +140,8 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DLFS_FAST_COMPILE=ON -DBUILD_PYTHON_STUBS=OFF -DLFS_DEV_IMPORT_SOURCE_PYTHON=OFF -DLFS_DEV_IMPORT_SOURCE_RESOURCES=OFF -DCUDA_DEVICE_DEBUG=OFF
-
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_TOOLCHAIN_FILE="../vcpkg/scripts/buildsystems/vcpkg.cmake" -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" -DLFS_FAST_COMPILE=ON -DBUILD_PYTHON_STUBS=OFF -DLFS_DEV_IMPORT_SOURCE_PYTHON=OFF -DLFS_DEV_IMPORT_SOURCE_RESOURCES=OFF -DCUDA_DEVICE_DEBUG=OFF
+      
       - name: Build
         shell: cmd
         run: |
@@ -152,32 +152,18 @@ jobs:
       - name: Stage Artifacts
         shell: pwsh
         run: |
-          # 1. 出力用フォルダ（dist）の初期化と、アプリが求めるフォルダ構造の作成
           if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
           New-Item -ItemType Directory -Force -Path dist
           New-Item -ItemType Directory -Force -Path dist/assets/rmlui
 
-          Write-Host "Copying minimal required files..."
-
-          # 2. メインの実行ファイルとPythonバイナリのコピー
+          # 1. 実行ファイル
           if (Test-Path "build/LichtFeld-Studio.exe") { Copy-Item "build/LichtFeld-Studio.exe" -Destination "dist/" }
-          if (Test-Path "build/src/python") {
-              New-Item -ItemType Directory -Force -Path "dist/src/python"
-              Copy-Item "build/src/python/*.pyd" -Destination "dist/src/python/" -ErrorAction SilentlyContinue
-          }
-
-          # 3. 依存DLLのコピー（不要なビルド中間フォルダを避けてbinのみを指定）
+          
+          # 2. 必要なDLL群（vcpkgの出力バイナリ）
           if (Test-Path "build/vcpkg_installed/x64-windows/bin") {
-              New-Item -ItemType Directory -Force -Path "dist/vcpkg_installed/x64-windows/bin"
-              Copy-Item "build/vcpkg_installed/x64-windows/bin/*.dll" -Destination "dist/vcpkg_installed/x64-windows/bin/" -ErrorAction SilentlyContinue
+              Copy-Item "build/vcpkg_installed/x64-windows/bin/*.dll" -Destination "dist/" -ErrorAction SilentlyContinue
           }
-          Get-ChildItem -Path "build/src" -Filter "*.dll" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-              $rel = $_.FullName.Substring("$PWD\build\".Length)
-              $dest = Join-Path "$PWD\dist" $rel
-              $parent = Split-Path $dest
-              if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-              Copy-Item $_.FullName -Destination $dest -Force -ErrorAction SilentlyContinue
-          }
+          Get-ChildItem -Path "build/src" -Filter "*.dll" -Recurse -ErrorAction SilentlyContinue | Copy-Item -Destination "dist/" -ErrorAction SilentlyContinue
 
           # 4. 【今回の本命】特定したフォルダ内の中身を、dist/assets/rmlui/ 直下に丸ごとコピー
           $targetResourceDir = "src/visualizer/gui/rmlui/resources"
