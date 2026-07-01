@@ -141,17 +141,15 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           
-          # 過去の古い自動判定キャッシュが残らないように build フォルダを完全に削除
+          # 古いキャッシュを確実にクリア
           if exist build rmdir /s /q build
           
-          # 7.5 (Turing世代) をターゲットとして強制ロックするフラグを指定
+          # 特定のGPUに絞らず、NVIDIAの主要な世代（75, 80, 86, 89）すべてを網羅してビルドする
           cmake -B build -S . -G Ninja ^
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ^
             -DCMAKE_TOOLCHAIN_FILE="../vcpkg/scripts/buildsystems/vcpkg.cmake" ^
-            -DCMAKE_CUDA_ARCHITECTURES="75" ^
-            -DNVCC_FLAGS="-arch=sm_75" ^
-            -DCMAKE_CUDA_FLAGS="-arch=sm_75" ^
-            -DFASTGS_CUDA_ARCHITECTURES="75" ^
+            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" ^
+            -DFASTGS_CUDA_ARCHITECTURES="75;80;86;89" ^
             -DLFS_FAST_COMPILE=ON ^
             -DBUILD_PYTHON_STUBS=OFF ^
             -DLFS_DEV_IMPORT_SOURCE_PYTHON=OFF ^
